@@ -30,10 +30,10 @@ public final class SiteStore: ObservableObject {
         let fileURL = getFileURL()
         if let data = try? Data(contentsOf: fileURL),
            let decoded = try? JSONDecoder().decode([Site].self, from: data) {
-            self.sites = decoded.sorted(by: { $0.sortOrder < $1.sortOrder })
+            self.sites = decoded.filter { !$0.url.contains("pathhub.internal") && !$0.name.contains("version_code") }.sorted(by: { $0.sortOrder < $1.sortOrder })
         } else if let data = UserDefaults.standard.data(forKey: storageKey),
                   let decoded = try? JSONDecoder().decode([Site].self, from: data) {
-            self.sites = decoded.sorted(by: { $0.sortOrder < $1.sortOrder })
+            self.sites = decoded.filter { !$0.url.contains("pathhub.internal") && !$0.name.contains("version_code") }.sorted(by: { $0.sortOrder < $1.sortOrder })
         }
     }
 
@@ -96,7 +96,8 @@ public final class SiteStore: ObservableObject {
 
         Task {
             do {
-                let remoteSites = try await SupabaseClient.shared.fetchSites()
+                let fetched = try await SupabaseClient.shared.fetchSites()
+                let remoteSites = fetched.filter { !$0.url.contains("pathhub.internal") && !$0.name.contains("version_code") }
                 await MainActor.run {
                     if !remoteSites.isEmpty {
                         // Smart Reconcile: Preserve any local custom sites that haven't synced to remote yet

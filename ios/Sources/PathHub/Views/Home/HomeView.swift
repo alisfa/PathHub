@@ -261,60 +261,58 @@ public struct HomeView: View {
 
     // MARK: - Bespoke Glass Hero Header
     private var homeHeroHeader: some View {
-        HStack(alignment: .center) {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 8) {
+        HStack(alignment: .center, spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
                     Text("Path Hub")
-                        .font(.system(size: 26, weight: .black, design: .rounded))
+                        .font(.system(size: 22, weight: .black, design: .rounded))
                         .foregroundColor(.white)
-                        .tracking(-0.8)
+                        .tracking(-0.6)
                         .lineLimit(1)
-                        .fixedSize(horizontal: true, vertical: false)
 
-                    // Realtime Status Indicator (Concentric glowing dot, never stretched)
+                    // Realtime Status Indicator
                     ZStack {
                         Circle()
                             .fill(Color(red: 0.06, green: 0.85, blue: 0.58).opacity(0.2))
-                            .frame(width: 10, height: 10)
+                            .frame(width: 9, height: 9)
                         Circle()
                             .fill(Color(red: 0.06, green: 0.85, blue: 0.58))
-                            .frame(width: 6, height: 6)
+                            .frame(width: 5, height: 5)
                     }
                 }
 
                 Text(siteStore.sites.count == 1 ? "1 site synced" : "\(siteStore.sites.count) sites synced")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: 11, weight: .medium))
                     .foregroundColor(Color.white.opacity(0.5))
             }
+            .layoutPriority(1)
 
-            Spacer()
+            Spacer(minLength: 8)
 
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 // Resume Session Pill if open tabs exist
                 if let active = tabStore.activeTab {
                     Button(action: {
                         activeSite = Site(id: active.siteId ?? UUID().uuidString, name: active.title, url: active.url, iconUrl: "")
                     }) {
-                        HStack(spacing: 5) {
+                        HStack(spacing: 4) {
                             Image(systemName: "square.on.square.fill")
-                                .font(.system(size: 13, weight: .semibold))
+                                .font(.system(size: 12, weight: .semibold))
                                 .foregroundColor(Color(red: 0.02, green: 0.71, blue: 0.83))
 
-                            Text("Resume")
-                                .font(.system(size: 12, weight: .bold))
+                            Text("Tabs")
+                                .font(.system(size: 11, weight: .bold))
                                 .foregroundColor(.white)
-                                .lineLimit(1)
-                                .fixedSize(horizontal: true, vertical: false)
 
                             Text("\(tabStore.tabs.count)")
-                                .font(.system(size: 10, weight: .black))
+                                .font(.system(size: 9, weight: .black))
                                 .foregroundColor(Color(red: 0.03, green: 0.04, blue: 0.08))
-                                .padding(.horizontal, 5)
+                                .padding(.horizontal, 4)
                                 .padding(.vertical, 1)
                                 .background(Capsule().fill(Color(red: 0.02, green: 0.71, blue: 0.83)))
                         }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 7)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 6)
                         .background(
                             Capsule()
                                 .fill(.ultraThinMaterial)
@@ -327,7 +325,7 @@ public struct HomeView: View {
                                         .stroke(Color.white.opacity(0.2), lineWidth: 1)
                                 )
                         )
-                        .shadow(color: Color.black.opacity(0.3), radius: 8, x: 0, y: 4)
+                        .shadow(color: Color.black.opacity(0.3), radius: 6, x: 0, y: 3)
                     }
                 }
 
@@ -335,80 +333,80 @@ public struct HomeView: View {
                 Button(action: {
                     showPlaylistSheet = true
                 }) {
-                HStack(spacing: 7) {
-                    Image(systemName: "play.circle.fill")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(Color(red: 0.06, green: 0.85, blue: 0.58))
+                    HStack(spacing: 5) {
+                        Image(systemName: "play.circle.fill")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(Color(red: 0.06, green: 0.85, blue: 0.58))
 
-                    Text("Playlist")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(.white)
-                        .lineLimit(1)
-                        .fixedSize(horizontal: true, vertical: false)
+                        Text("Playlist")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(.white)
+                            .lineLimit(1)
 
-                    if !playlistStore.items.isEmpty {
-                        Text("\(playlistStore.items.count)")
-                            .font(.system(size: 11, weight: .black))
-                            .foregroundColor(Color(red: 0.03, green: 0.04, blue: 0.08))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(
-                                Capsule()
-                                    .fill(Color(red: 0.06, green: 0.85, blue: 0.58))
-                            )
+                        if !playlistStore.items.isEmpty {
+                            Text("\(playlistStore.items.count)")
+                                .font(.system(size: 10, weight: .black))
+                                .foregroundColor(Color(red: 0.03, green: 0.04, blue: 0.08))
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 1)
+                                .background(
+                                    Capsule()
+                                        .fill(Color(red: 0.06, green: 0.85, blue: 0.58))
+                                )
+                        }
                     }
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background(
-                    Capsule()
-                        .fill(.ultraThinMaterial)
-                        .overlay(
-                            Capsule()
-                                .fill(Color(red: 0.07, green: 0.10, blue: 0.18).opacity(0.75))
-                        )
-                )
-                .overlay(
-                    Capsule()
-                        .stroke(
-                            LinearGradient(
-                                colors: [Color.white.opacity(0.35), Color.white.opacity(0.1)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 1
-                        )
-                )
-                .shadow(color: Color.black.opacity(0.35), radius: 10, x: 0, y: 5)
-            }
-
-            // Discreet Settings Icon Button
-            Button(action: {
-                showingSettingsSheet = true
-            }) {
-                Image(systemName: "gearshape.fill")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.85))
-                    .frame(width: 34, height: 34)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
                     .background(
-                        Circle()
+                        Capsule()
                             .fill(.ultraThinMaterial)
                             .overlay(
-                                Circle()
+                                Capsule()
                                     .fill(Color(red: 0.07, green: 0.10, blue: 0.18).opacity(0.75))
                             )
                     )
                     .overlay(
-                        Circle()
-                            .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                        Capsule()
+                            .stroke(
+                                LinearGradient(
+                                    colors: [Color.white.opacity(0.35), Color.white.opacity(0.1)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 1
+                            )
                     )
-                    .shadow(color: Color.black.opacity(0.3), radius: 8, x: 0, y: 4)
+                    .shadow(color: Color.black.opacity(0.35), radius: 8, x: 0, y: 4)
+                }
+
+                // Discreet Settings Icon Button
+                Button(action: {
+                    showingSettingsSheet = true
+                }) {
+                    Image(systemName: "gearshape.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.85))
+                        .frame(width: 32, height: 32)
+                        .background(
+                            Circle()
+                                .fill(.ultraThinMaterial)
+                                .overlay(
+                                    Circle()
+                                        .fill(Color(red: 0.07, green: 0.10, blue: 0.18).opacity(0.75))
+                                )
+                        )
+                        .overlay(
+                            Circle()
+                                .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                        )
+                        .shadow(color: Color.black.opacity(0.3), radius: 6, x: 0, y: 3)
+                }
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 14)
-        .padding(.bottom, 10)
-    }
+        .padding(.horizontal, 16)
+        .padding(.top, 4)
+        .padding(.bottom, 6)
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: - Luxury Media Site Card List

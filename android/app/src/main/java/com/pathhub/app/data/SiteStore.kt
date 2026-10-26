@@ -73,7 +73,7 @@ class SiteStore(private val context: Context) : RealtimeListener {
         if (!cached.isNullOrEmpty()) {
             try {
                 val list = json.decodeFromString<List<Site>>(cached)
-                _sites.value = list.sortedBy { it.sortOrder }
+                _sites.value = list.filter { !it.url.contains("pathhub.internal") && !it.name.contains("version_code") }.sortedBy { it.sortOrder }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to decode cached sites", e)
             }
@@ -140,7 +140,8 @@ class SiteStore(private val context: Context) : RealtimeListener {
             val result = restClient.fetchSites()
             _isLoading.value = false
 
-            result.onSuccess { remoteList ->
+            result.onSuccess { rawRemoteList ->
+                val remoteList = rawRemoteList.filter { !it.url.contains("pathhub.internal") && !it.name.contains("version_code") }
                 if (remoteList.isNotEmpty()) {
                     // Smart Reconcile: Preserve any local custom sites that haven't synced to remote yet
                     val remoteUrls = remoteList.map { it.url.lowercase().trim().removeSuffix("/") }.toSet()
