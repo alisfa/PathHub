@@ -1,0 +1,21 @@
+# Build outputs & artifacts
+android/build/
+android/app/build/
+android/.gradle/
+android/.kotlin/
+android/local.properties
+
+ios/.build/
+ios/xtool/PathHub.app
+ios/xtool/.xtool-tmp
+
+player-web/node_modules/
+vpn-worker/.wrangler/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# OS files
+.DS_Store
+Thumbs.db
