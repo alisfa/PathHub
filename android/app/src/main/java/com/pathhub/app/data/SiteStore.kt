@@ -73,7 +73,7 @@ class SiteStore(private val context: Context) : RealtimeListener {
         if (!cached.isNullOrEmpty()) {
             try {
                 val list = json.decodeFromString<List<Site>>(cached)
-                _sites.value = list.filter { !it.url.contains("pathhub.internal") && !it.name.contains("version_code") }.sortedBy { it.sortOrder }
+                _sites.value = list.filter { !isDisallowed(it) }.sortedBy { it.sortOrder }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to decode cached sites", e)
             }
@@ -92,6 +92,19 @@ class SiteStore(private val context: Context) : RealtimeListener {
         } catch (e: Exception) {
             Log.e(TAG, "Failed to save sites cache", e)
         }
+    }
+
+    private fun isDisallowed(site: Site): Boolean {
+        val u = site.url.lowercase()
+        val n = site.name.lowercase()
+        return u.contains("pathhub.internal") ||
+               u.contains("commondatastorage.googleapis.com") ||
+               u.contains("archive.org") ||
+               u.contains("w3schools.com") ||
+               n.contains("big buck bunny") ||
+               n.contains("internet archive") ||
+               n.contains("html5 video") ||
+               n.contains("version_code")
     }
 
     private fun defaultSeedSites(): List<Site> {
@@ -116,20 +129,6 @@ class SiteStore(private val context: Context) : RealtimeListener {
                 url = "https://www.xvideos.com",
                 iconUrl = "https://www.google.com/s2/favicons?domain=xvideos.com&sz=128",
                 sortOrder = 2
-            ),
-            Site(
-                id = UUID.randomUUID().toString(),
-                name = "Big Buck Bunny (MP4 Demo)",
-                url = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-                iconUrl = "https://www.google.com/s2/favicons?domain=blender.org&sz=128",
-                sortOrder = 1
-            ),
-            Site(
-                id = UUID.randomUUID().toString(),
-                name = "Internet Archive Cinema",
-                url = "https://archive.org/details/moviesandfilms",
-                iconUrl = "https://www.google.com/s2/favicons?domain=archive.org&sz=128",
-                sortOrder = 2
             )
         )
     }
@@ -141,7 +140,7 @@ class SiteStore(private val context: Context) : RealtimeListener {
             _isLoading.value = false
 
             result.onSuccess { rawRemoteList ->
-                val remoteList = rawRemoteList.filter { !it.url.contains("pathhub.internal") && !it.name.contains("version_code") }
+                val remoteList = rawRemoteList.filter { !isDisallowed(it) }
                 if (remoteList.isNotEmpty()) {
                     // Smart Reconcile: Preserve any local custom sites that haven't synced to remote yet
                     val remoteUrls = remoteList.map { it.url.lowercase().trim().removeSuffix("/") }.toSet()

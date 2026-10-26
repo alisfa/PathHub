@@ -30,10 +30,10 @@ public final class SiteStore: ObservableObject {
         let fileURL = getFileURL()
         if let data = try? Data(contentsOf: fileURL),
            let decoded = try? JSONDecoder().decode([Site].self, from: data) {
-            self.sites = decoded.filter { !$0.url.contains("pathhub.internal") && !$0.name.contains("version_code") }.sorted(by: { $0.sortOrder < $1.sortOrder })
+            self.sites = decoded.filter { !self.isDisallowed($0) }.sorted(by: { $0.sortOrder < $1.sortOrder })
         } else if let data = UserDefaults.standard.data(forKey: storageKey),
                   let decoded = try? JSONDecoder().decode([Site].self, from: data) {
-            self.sites = decoded.filter { !$0.url.contains("pathhub.internal") && !$0.name.contains("version_code") }.sorted(by: { $0.sortOrder < $1.sortOrder })
+            self.sites = decoded.filter { !self.isDisallowed($0) }.sorted(by: { $0.sortOrder < $1.sortOrder })
         }
     }
 
@@ -43,6 +43,19 @@ public final class SiteStore: ObservableObject {
             try? encoded.write(to: getFileURL(), options: .atomic)
             UserDefaults.standard.set(encoded, forKey: storageKey)
         }
+    }
+
+    private func isDisallowed(_ site: Site) -> Bool {
+        let u = site.url.lowercased()
+        let n = site.name.lowercased()
+        return u.contains("pathhub.internal") ||
+               u.contains("commondatastorage.googleapis.com") ||
+               u.contains("archive.org") ||
+               u.contains("w3schools.com") ||
+               n.contains("big buck bunny") ||
+               n.contains("internet archive") ||
+               n.contains("html5 video") ||
+               n.contains("version_code")
     }
 
     private func seedDefaultSites() {
@@ -64,24 +77,6 @@ public final class SiteStore: ObservableObject {
                 url: "https://www.xvideos.com",
                 iconUrl: "https://www.google.com/s2/favicons?domain=xvideos.com&sz=128",
                 sortOrder: 2
-            ),
-            Site(
-                name: "Big Buck Bunny (MP4 Demo)",
-                url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-                iconUrl: "https://www.google.com/s2/favicons?domain=blender.org&sz=128",
-                sortOrder: 1
-            ),
-            Site(
-                name: "HTML5 Video Showcase",
-                url: "https://www.w3schools.com/html/html5_video.asp",
-                iconUrl: "https://www.google.com/s2/favicons?domain=w3schools.com&sz=128",
-                sortOrder: 2
-            ),
-            Site(
-                name: "Internet Archive Cinema",
-                url: "https://archive.org/details/moviesandfilms",
-                iconUrl: "https://www.google.com/s2/favicons?domain=archive.org&sz=128",
-                sortOrder: 3
             )
         ]
         self.sites = defaults
@@ -97,7 +92,7 @@ public final class SiteStore: ObservableObject {
         Task {
             do {
                 let fetched = try await SupabaseClient.shared.fetchSites()
-                let remoteSites = fetched.filter { !$0.url.contains("pathhub.internal") && !$0.name.contains("version_code") }
+                let remoteSites = fetched.filter { !self.isDisallowed($0) }
                 await MainActor.run {
                     if !remoteSites.isEmpty {
                         // Smart Reconcile: Preserve any local custom sites that haven't synced to remote yet
