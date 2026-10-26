@@ -510,7 +510,7 @@ fun AppSettingsDialog(
                                             isCheckingUpdate = true
                                             updateManager.setGitHubRepo(githubRepo)
                                             scope.launch {
-                                                val res = updateManager.checkForUpdates()
+                                                val res = updateManager.checkForUpdates(force = true)
                                                 isCheckingUpdate = false
                                                 res.fold(
                                                     onSuccess = { update ->

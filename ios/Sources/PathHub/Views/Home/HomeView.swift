@@ -210,9 +210,12 @@ public struct HomeView: View {
             .sheet(isPresented: $showingSettingsSheet) {
                 AccountSheet()
             }
-            .sheet(item: $updateService.availableUpdate) { update in
-                UpdateSheet(update: update)
-            }
+            .background(
+                Color.clear
+                    .sheet(item: $updateService.availableUpdate) { update in
+                        UpdateSheet(update: update)
+                    }
+            )
             .fullScreenCover(item: $activeSite) { site in
                 let targetStr = VpnManager.shared.resolveUrl(site.url)
                 if let url = URL(string: targetStr) {

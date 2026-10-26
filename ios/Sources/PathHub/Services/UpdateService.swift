@@ -123,29 +123,42 @@ public final class UpdateService: NSObject, ObservableObject, URLSessionDownload
             }
 
             // Find IPA asset
-            guard let assets = json["assets"] as? [[String: Any]] else {
-                return nil
+            if let assets = json["assets"] as? [[String: Any]] {
+                for asset in assets {
+                    if let name = asset["name"] as? String,
+                       name.lowercased().hasSuffix(".ipa"),
+                       let downloadUrlStr = asset["browser_download_url"] as? String,
+                       let downloadUrl = URL(string: downloadUrlStr) {
+                        let size = (asset["size"] as? Int64) ?? 0
+
+                        let update = UpdateInfo(
+                            tagName: tagName,
+                            releaseName: releaseName,
+                            changelog: body,
+                            downloadUrl: downloadUrl,
+                            fileName: name,
+                            fileSize: size,
+                            htmlUrl: htmlUrl
+                        )
+                        self.availableUpdate = update
+                        return update
+                    }
+                }
             }
 
-            for asset in assets {
-                if let name = asset["name"] as? String,
-                   name.lowercased().hasSuffix(".ipa"),
-                   let downloadUrlStr = asset["browser_download_url"] as? String,
-                   let downloadUrl = URL(string: downloadUrlStr) {
-                    let size = (asset["size"] as? Int64) ?? 0
-
-                    let update = UpdateInfo(
-                        tagName: tagName,
-                        releaseName: releaseName,
-                        changelog: body,
-                        downloadUrl: downloadUrl,
-                        fileName: name,
-                        fileSize: size,
-                        htmlUrl: htmlUrl
-                    )
-                    self.availableUpdate = update
-                    return update
-                }
+            // Fallback direct release download
+            if let fallbackUrl = URL(string: "https://github.com/\(repo)/releases/download/\(tagName)/PathHub-unsigned.ipa") {
+                let update = UpdateInfo(
+                    tagName: tagName,
+                    releaseName: releaseName,
+                    changelog: body,
+                    downloadUrl: fallbackUrl,
+                    fileName: "PathHub-unsigned.ipa",
+                    fileSize: 1370000,
+                    htmlUrl: htmlUrl
+                )
+                self.availableUpdate = update
+                return update
             }
 
             return nil

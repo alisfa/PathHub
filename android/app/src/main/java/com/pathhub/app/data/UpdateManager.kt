@@ -100,75 +100,97 @@ class UpdateManager private constructor(private val context: Context) {
         }
     }
 
-    suspend fun checkForUpdates(): Result<UpdateInfo?> = withContext(Dispatchers.IO) {
+    suspend fun checkForUpdates(force: Boolean = false): Result<UpdateInfo?> = withContext(Dispatchers.IO) {
         try {
-            val repo = getGitHubRepo()
+            val repo = getGitHubRepo().trim().ifEmpty { DEFAULT_GITHUB_REPO }
+            val currentVer = getCurrentVersionName()
             val apiUrl = "https://api.github.com/repos/$repo/releases/latest"
             val url = URL(apiUrl)
             val conn = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
-                connectTimeout = 10000
-                readTimeout = 10000
+                connectTimeout = 8000
+                readTimeout = 8000
+                instanceFollowRedirects = true
                 setRequestProperty("Accept", "application/vnd.github.v3+json")
-                setRequestProperty("User-Agent", "PathHub-Android/${getCurrentVersionName()}")
+                setRequestProperty("User-Agent", "PathHub-Android/$currentVer")
             }
 
             val responseCode = conn.responseCode
-            if (responseCode == 404) {
-                // No releases found yet
-                return@withContext Result.success(null)
-            }
-            if (responseCode !in 200..299) {
-                return@withContext Result.failure(Exception("GitHub API responded with code $responseCode"))
-            }
+            if (responseCode in 200..299) {
+                val jsonStr = conn.inputStream.bufferedReader().use { it.readText() }
+                val releaseJson = JSONObject(jsonStr)
 
-            val jsonStr = conn.inputStream.bufferedReader().use { it.readText() }
-            val releaseJson = JSONObject(jsonStr)
+                val tagName = releaseJson.optString("tag_name", "")
+                val releaseName = releaseJson.optString("name", tagName)
+                val changelog = releaseJson.optString("body", "No release notes provided.")
+                val htmlUrl = releaseJson.optString("html_url", "https://github.com/$repo/releases")
 
-            val tagName = releaseJson.optString("tag_name", "")
-            val releaseName = releaseJson.optString("name", tagName)
-            val changelog = releaseJson.optString("body", "No release notes provided.")
-            val htmlUrl = releaseJson.optString("html_url", "https://github.com/$repo/releases")
-
-            val currentVer = getCurrentVersionName()
-            if (compareVersions(tagName, currentVer) <= 0) {
-                // Up to date
-                return@withContext Result.success(null)
-            }
-
-            // Find APK asset
-            val assetsArray = releaseJson.optJSONArray("assets") ?: return@withContext Result.success(null)
-            var apkUrl: String? = null
-            var apkName: String? = null
-            var apkSize: Long = 0
-
-            for (i in 0 until assetsArray.length()) {
-                val asset = assetsArray.getJSONObject(i)
-                val name = asset.optString("name", "")
-                if (name.endsWith(".apk", ignoreCase = true)) {
-                    apkUrl = asset.optString("browser_download_url", "")
-                    apkName = name
-                    apkSize = asset.optLong("size", 0)
-                    break
+                if (!force && compareVersions(tagName, currentVer) <= 0) {
+                    // Up to date
+                    return@withContext Result.success(null)
                 }
+
+                // Find APK asset
+                val assetsArray = releaseJson.optJSONArray("assets")
+                var apkUrl: String? = null
+                var apkName: String? = null
+                var apkSize: Long = 0
+
+                if (assetsArray != null) {
+                    for (i in 0 until assetsArray.length()) {
+                        val asset = assetsArray.getJSONObject(i)
+                        val name = asset.optString("name", "")
+                        if (name.endsWith(".apk", ignoreCase = true)) {
+                            apkUrl = asset.optString("browser_download_url", "")
+                            apkName = name
+                            apkSize = asset.optLong("size", 0)
+                            break
+                        }
+                    }
+                }
+
+                if (apkUrl.isNullOrEmpty()) {
+                    apkUrl = "https://github.com/$repo/releases/download/$tagName/PathHub-debug.apk"
+                    apkName = "PathHub-debug.apk"
+                }
+
+                val updateInfo = UpdateInfo(
+                    tagName = tagName,
+                    releaseName = releaseName,
+                    changelog = changelog,
+                    downloadUrl = apkUrl,
+                    fileName = apkName ?: "PathHub-debug.apk",
+                    fileSize = apkSize,
+                    htmlUrl = htmlUrl
+                )
+                return@withContext Result.success(updateInfo)
+            } else {
+                // Fallback: GitHub Releases redirect resolution (bypass API rate-limit)
+                val webConn = (URL("https://github.com/$repo/releases/latest").openConnection() as HttpURLConnection).apply {
+                    instanceFollowRedirects = false
+                    requestMethod = "GET"
+                    setRequestProperty("User-Agent", "Mozilla/5.0")
+                }
+                val redirectUrl = webConn.getHeaderField("Location") ?: ""
+                if (redirectUrl.contains("/releases/tag/")) {
+                    val tag = redirectUrl.substringAfterLast("/")
+                    if (force || compareVersions(tag, currentVer) > 0) {
+                        val updateInfo = UpdateInfo(
+                            tagName = tag,
+                            releaseName = "Path Hub $tag",
+                            changelog = "Latest official release from GitHub.",
+                            downloadUrl = "https://github.com/$repo/releases/download/$tag/PathHub-debug.apk",
+                            fileName = "PathHub-debug.apk",
+                            fileSize = 17500000L,
+                            htmlUrl = "https://github.com/$repo/releases/tag/$tag"
+                        )
+                        return@withContext Result.success(updateInfo)
+                    } else {
+                        return@withContext Result.success(null)
+                    }
+                }
+                return@withContext Result.failure(Exception("GitHub status $responseCode"))
             }
-
-            if (apkUrl.isNullOrEmpty() || apkName.isNullOrEmpty()) {
-                // No APK asset attached to this release
-                return@withContext Result.success(null)
-            }
-
-            val updateInfo = UpdateInfo(
-                tagName = tagName,
-                releaseName = releaseName,
-                changelog = changelog,
-                downloadUrl = apkUrl,
-                fileName = apkName,
-                fileSize = apkSize,
-                htmlUrl = htmlUrl
-            )
-
-            Result.success(updateInfo)
         } catch (e: Exception) {
             Result.failure(e)
         }
