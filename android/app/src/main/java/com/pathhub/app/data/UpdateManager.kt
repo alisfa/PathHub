@@ -43,6 +43,7 @@ class UpdateManager private constructor(private val context: Context) {
 
     companion object {
         const val DEFAULT_GITHUB_REPO = "alisfa/PathHub"
+        const val COMPILE_VERSION = "1.0.2"
         private const val PREF_REPO_KEY = "github_repo"
 
         @Volatile
@@ -94,9 +95,9 @@ class UpdateManager private constructor(private val context: Context) {
                 @Suppress("DEPRECATION")
                 context.packageManager.getPackageInfo(context.packageName, 0)
             }
-            pInfo.versionName ?: "1.0.0"
+            pInfo.versionName?.ifEmpty { COMPILE_VERSION } ?: COMPILE_VERSION
         } catch (_: Exception) {
-            "1.0.0"
+            COMPILE_VERSION
         }
     }
 

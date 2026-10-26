@@ -19,6 +19,7 @@ public final class UpdateService: NSObject, ObservableObject, URLSessionDownload
     public static let shared = UpdateService()
 
     public static let defaultRepo = "alisfa/PathHub"
+    public static let compileVersion = "1.0.2"
     private let repoKey = "pathhub_github_repo"
 
     @Published public var availableUpdate: UpdateInfo? = nil
@@ -49,7 +50,11 @@ public final class UpdateService: NSObject, ObservableObject, URLSessionDownload
     }
 
     public func getCurrentVersion() -> String {
-        return (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "1.0.0"
+        if let bundleVer = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String,
+           bundleVer != "1.0.0" && !bundleVer.isEmpty {
+            return bundleVer
+        }
+        return Self.compileVersion
     }
 
     public static func compareVersions(_ remote: String, _ current: String) -> ComparisonResult {
