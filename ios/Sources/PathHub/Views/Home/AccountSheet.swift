@@ -20,6 +20,12 @@ public struct AccountSheet: View {
     @State private var supabaseUrl = SupabaseConfig.url
     @State private var supabaseKey = SupabaseConfig.anonKey
 
+    // Balaboo PIN & History
+    @State private var showingPinPrompt = false
+    @State private var pinInput = ""
+    @State private var pinError = false
+    @State private var showingBalabooHistory = false
+
     public init() {}
 
     public var body: some View {
@@ -205,6 +211,23 @@ public struct AccountSheet: View {
                         successMessage = "Supabase configuration updated!"
                     }
                 }
+
+                Section {
+                    Button(action: {
+                        pinInput = ""
+                        pinError = false
+                        showingPinPrompt = true
+                    }) {
+                        HStack {
+                            Text("Balaboo")
+                                .foregroundColor(.primary)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
             }
             .navigationTitle("Settings & Account")
             .navigationBarTitleDisplayMode(.inline)
@@ -215,11 +238,38 @@ public struct AccountSheet: View {
                     }
                 }
             }
+            .alert("Balaboo Verification", isPresented: $showingPinPrompt) {
+                SecureField("PIN", text: $pinInput)
+                    .keyboardType(.numberPad)
+                Button("Cancel", role: .cancel) {
+                    pinInput = ""
+                }
+                Button("Unlock") {
+                    if pinInput == "1991" {
+                        showingBalabooHistory = true
+                    } else {
+                        pinError = true
+                    }
+                }
+            } message: {
+                Text("Enter PIN to access secure history.")
+            }
+            .alert("Incorrect PIN", isPresented: $pinError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("The entered PIN is incorrect. Access denied.")
+            }
             .sheet(isPresented: $showingUpdateSheet) {
                 if let u = updateService.availableUpdate {
                     UpdateSheet(update: u)
                 }
             }
+            .background(
+                Color.clear
+                    .sheet(isPresented: $showingBalabooHistory) {
+                        BalabooHistorySheet()
+                    }
+            )
         }
     }
 

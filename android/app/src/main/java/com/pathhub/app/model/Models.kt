@@ -78,3 +78,13 @@ data class VideoSavePayload(
     val siteId: String? = null,
     val timestamp: Long = 0L
 )
+
+@Serializable
+data class HistoryItem(
+    val id: String = "",
+    val url: String = "",
+    val title: String = "",
+    @SerialName("device_name") val deviceName: String = "",
+    @SerialName("visited_at") val visitedAt: String = "",
+    @SerialName("created_at") val createdAt: String = ""
+)

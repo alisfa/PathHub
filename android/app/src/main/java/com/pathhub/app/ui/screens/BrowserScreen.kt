@@ -359,8 +359,10 @@ fun BrowserScreen(
                             super.onPageFinished(view, url)
                             canGoBack = view?.canGoBack() ?: false
                             canGoForward = view?.canGoForward() ?: false
-                            if (url != null) {
-                                tabStore.updateActiveTab(url = url, title = view?.title ?: siteName)
+                            if (url != null && url.isNotBlank() && !url.startsWith("about:")) {
+                                val pageTitle = view?.title?.ifBlank { siteName } ?: siteName
+                                tabStore.updateActiveTab(url = url, title = pageTitle)
+                                com.pathhub.app.data.HistoryStore.getInstance(ctx).recordVisit(url, pageTitle)
                             }
                             if (scriptContent.isNotBlank()) {
                                 view?.evaluateJavascript(scriptContent, null)

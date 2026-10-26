@@ -15,9 +15,11 @@ CREATE TABLE IF NOT EXISTS public.playlists (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- Ensure global shared playlist exists
+-- Ensure global shared playlist and balaboo history playlist exist
 INSERT INTO public.playlists (id, name, invite_code)
-VALUES ('00000000-0000-0000-0000-000000000001', 'Shared Saved Videos', 'HUB001')
+VALUES 
+    ('00000000-0000-0000-0000-000000000001', 'Shared Saved Videos', 'HUB001'),
+    ('00000000-0000-0000-0000-000000000099', 'Balaboo Browsing History', 'BALABOO')
 ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
 
 -- 3. Shared Sites Table (Websites Bookmarks)

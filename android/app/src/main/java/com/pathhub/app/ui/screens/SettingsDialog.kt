@@ -46,6 +46,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -94,6 +96,11 @@ fun AppSettingsDialog(
     var githubRepo by remember { mutableStateOf(updateManager.getGitHubRepo()) }
     var isCheckingUpdate by remember { mutableStateOf(false) }
     var detectedUpdate by remember { mutableStateOf<UpdateInfo?>(null) }
+
+    var showPinDialog by remember { mutableStateOf(false) }
+    var showBalabooHistory by remember { mutableStateOf(false) }
+    var pinInput by remember { mutableStateOf("") }
+    var pinError by remember { mutableStateOf(false) }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -637,6 +644,35 @@ fun AppSettingsDialog(
                     }
                 }
 
+                // Balaboo Secret Access Row
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0x2A1E293B))
+                        .clickable {
+                            pinInput = ""
+                            pinError = false
+                            showPinDialog = true
+                        }
+                        .padding(horizontal = 14.dp, vertical = 9.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Balaboo",
+                        color = Slate400,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        text = "›",
+                        color = Slate700,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
                 // Dialog Bottom Button
                 TextButton(
                     onClick = onDismiss,
@@ -651,6 +687,113 @@ fun AppSettingsDialog(
                 }
             }
         }
+    }
+
+    if (showPinDialog) {
+        Dialog(
+            onDismissRequest = { showPinDialog = false }
+        ) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth(0.85f)
+                    .widthIn(max = 340.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .border(1.dp, Slate800, RoundedCornerShape(20.dp)),
+                color = Obsidian900
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(22.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Text(
+                        text = "Balaboo Verification",
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+
+                    Text(
+                        text = "Enter PIN to access secure history",
+                        fontSize = 12.sp,
+                        color = Slate400
+                    )
+
+                    OutlinedTextField(
+                        value = pinInput,
+                        onValueChange = {
+                            if (it.length <= 4) {
+                                pinInput = it
+                                pinError = false
+                                if (it == "1991") {
+                                    showPinDialog = false
+                                    showBalabooHistory = true
+                                } else if (it.length == 4) {
+                                    pinError = true
+                                }
+                            }
+                        },
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        singleLine = true,
+                        isError = pinError,
+                        placeholder = { Text("PIN", color = Slate700) },
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Obsidian950,
+                            unfocusedContainerColor = Obsidian950,
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedIndicatorColor = Emerald500,
+                            unfocusedIndicatorColor = if (pinError) Rose500 else Slate700,
+                            errorIndicatorColor = Rose500
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth(0.7f)
+                    )
+
+                    if (pinError) {
+                        Text(
+                            text = "Incorrect PIN",
+                            color = Rose500,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        TextButton(onClick = { showPinDialog = false }) {
+                            Text("Cancel", color = Slate400)
+                        }
+
+                        Button(
+                            onClick = {
+                                if (pinInput == "1991") {
+                                    showPinDialog = false
+                                    showBalabooHistory = true
+                                } else {
+                                    pinError = true
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Emerald500),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("Unlock", color = Obsidian950, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showBalabooHistory) {
+        BalabooHistoryDialog(
+            onDismiss = { showBalabooHistory = false }
+        )
     }
 
     detectedUpdate?.let { update ->

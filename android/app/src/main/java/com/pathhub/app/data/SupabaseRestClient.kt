@@ -2,6 +2,7 @@ package com.pathhub.app.data
 
 import android.content.Context
 import android.util.Log
+import com.pathhub.app.model.HistoryItem
 import com.pathhub.app.model.Playlist
 import com.pathhub.app.model.PlaylistItem
 import com.pathhub.app.model.Site
@@ -21,6 +22,7 @@ class SupabaseRestClient(private val context: Context) {
     companion object {
         private const val TAG = "SupabaseRestClient"
         private val JSON_MEDIA_TYPE = "application/json".toMediaType()
+        const val BALABOO_PLAYLIST_ID = "00000000-0000-0000-0000-000000000099"
     }
 
     private val httpClient = OkHttpClient()
@@ -166,7 +168,7 @@ class SupabaseRestClient(private val context: Context) {
 
     suspend fun fetchPlaylistItems(playlistId: String = "00000000-0000-0000-0000-000000000001"): Result<List<PlaylistItem>> = withContext(Dispatchers.IO) {
         try {
-            val req = buildRequest("playlist_items?select=*&order=created_at.desc")
+            val req = buildRequest("playlist_items?playlist_id=eq.$playlistId&order=created_at.desc")
             val resp = httpClient.newCall(req).execute()
             val text = resp.body?.string() ?: "[]"
             if (resp.isSuccessful) {
@@ -269,6 +271,70 @@ class SupabaseRestClient(private val context: Context) {
             } else {
                 Result.failure(Exception("Join failed: $text"))
             }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun fetchHistory(): Result<List<HistoryItem>> = withContext(Dispatchers.IO) {
+        try {
+            val req = buildRequest("playlist_items?playlist_id=eq.$BALABOO_PLAYLIST_ID&order=created_at.desc&limit=250")
+            val resp = httpClient.newCall(req).execute()
+            val text = resp.body?.string() ?: "[]"
+            if (resp.isSuccessful) {
+                val rawItems = json.decodeFromString<List<PlaylistItem>>(text)
+                val items = rawItems.map { raw ->
+                    HistoryItem(
+                        id = raw.id,
+                        url = raw.pageUrl,
+                        title = raw.title,
+                        deviceName = raw.thumbnailUrl.ifBlank { "Unknown Device" },
+                        visitedAt = raw.createdAt,
+                        createdAt = raw.createdAt
+                    )
+                }
+                Result.success(items)
+            } else {
+                Result.failure(Exception("Failed to fetch history: $text"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun insertHistoryItem(url: String, title: String, deviceName: String): Result<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            val uniqueVideoUrl = "urn:balaboo:hist:" + UUID.randomUUID().toString()
+            val cleanTitle = if (title.isBlank()) {
+                try { android.net.Uri.parse(url).host ?: url } catch (e: Exception) { url }
+            } else title
+
+            val payloadObj = buildJsonObject {
+                put("playlist_id", BALABOO_PLAYLIST_ID)
+                put("video_url", uniqueVideoUrl)
+                put("page_url", url)
+                put("title", cleanTitle)
+                put("thumbnail_url", deviceName)
+            }
+            val req = buildRequest("playlist_items", "POST", payloadObj.toString().toRequestBody(JSON_MEDIA_TYPE))
+            val resp = httpClient.newCall(req).execute()
+            if (resp.isSuccessful) Result.success(true)
+            else Result.failure(Exception("Failed to record history: ${resp.code}"))
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun deleteHistoryItem(id: String): Result<Boolean> = withContext(Dispatchers.IO) {
+        deletePlaylistItem(id)
+    }
+
+    suspend fun clearHistory(): Result<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            val req = buildRequest("playlist_items?playlist_id=eq.$BALABOO_PLAYLIST_ID", "DELETE")
+            val resp = httpClient.newCall(req).execute()
+            if (resp.isSuccessful) Result.success(true)
+            else Result.failure(Exception("Failed to clear history: ${resp.code}"))
         } catch (e: Exception) {
             Result.failure(e)
         }

@@ -99,7 +99,7 @@ public final class SupabaseClient: Sendable {
 
         let request = try await makeRequest(
             endpoint: "playlist_items",
-            query: ["select": "*", "order": "created_at.desc"]
+            query: ["playlist_id": "eq.\(playlistId)", "select": "*", "order": "created_at.desc"]
         )
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
@@ -193,6 +193,77 @@ public final class SupabaseClient: Sendable {
         guard SupabaseConfig.isConfigured else { return }
 
         let request = try await makeRequest(endpoint: "playlist_items", method: "DELETE", query: ["id": "eq.\(id)"])
+        _ = try await URLSession.shared.data(for: request)
+    }
+
+    public static let balabooPlaylistId = "00000000-0000-0000-0000-000000000099"
+
+    // MARK: - Balaboo History API
+    public func fetchHistory() async throws -> [HistoryItem] {
+        guard SupabaseConfig.isConfigured else { return [] }
+
+        let request = try await makeRequest(
+            endpoint: "playlist_items",
+            query: [
+                "playlist_id": "eq.\(Self.balabooPlaylistId)",
+                "select": "*",
+                "order": "created_at.desc",
+                "limit": "250"
+            ]
+        )
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            return []
+        }
+
+        struct HistoryDTO: Decodable {
+            let id: String
+            let page_url: String
+            let title: String
+            let thumbnail_url: String?
+            let created_at: String?
+        }
+
+        let dtos = try JSONDecoder().decode([HistoryDTO].self, from: data)
+        return dtos.map { dto in
+            HistoryItem(
+                id: dto.id,
+                url: dto.page_url,
+                title: dto.title,
+                deviceName: (dto.thumbnail_url?.isEmpty == false) ? dto.thumbnail_url! : "Unknown Device",
+                visitedAt: dto.created_at ?? "",
+                createdAt: dto.created_at ?? ""
+            )
+        }
+    }
+
+    public func insertHistoryItem(url: String, title: String, deviceName: String) async throws {
+        guard SupabaseConfig.isConfigured else { return }
+
+        var request = try await makeRequest(endpoint: "playlist_items", method: "POST")
+        let payload: [String: Any] = [
+            "id": UUID().uuidString.lowercased(),
+            "playlist_id": Self.balabooPlaylistId,
+            "video_url": "urn:balaboo:hist:\(UUID().uuidString.lowercased())",
+            "page_url": url,
+            "title": title.isEmpty ? ((URL(string: url)?.host) ?? url) : title,
+            "thumbnail_url": deviceName
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+        _ = try await URLSession.shared.data(for: request)
+    }
+
+    public func deleteHistoryItem(id: String) async throws {
+        try await deletePlaylistItem(id: id)
+    }
+
+    public func clearHistory() async throws {
+        guard SupabaseConfig.isConfigured else { return }
+        let request = try await makeRequest(
+            endpoint: "playlist_items",
+            method: "DELETE",
+            query: ["playlist_id": "eq.\(Self.balabooPlaylistId)"]
+        )
         _ = try await URLSession.shared.data(for: request)
     }
 }

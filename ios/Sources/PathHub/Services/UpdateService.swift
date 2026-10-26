@@ -19,7 +19,7 @@ public final class UpdateService: NSObject, ObservableObject, URLSessionDownload
     public static let shared = UpdateService()
 
     public static let defaultRepo = "alisfa/PathHub"
-    public static let compileVersion = "1.0.3"
+    public static let compileVersion = "1.0.4"
     private let repoKey = "pathhub_github_repo"
 
     @Published public var availableUpdate: UpdateInfo? = nil

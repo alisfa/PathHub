@@ -321,6 +321,10 @@ public struct WebViewContainer: UIViewRepresentable {
             parent.canGoBack = webView.canGoBack
             parent.canGoForward = webView.canGoForward
             parent.currentTitle = webView.title ?? ""
+
+            if let currentUrl = webView.url?.absoluteString, !currentUrl.isEmpty, !currentUrl.starts(with: "about:") {
+                HistoryStore.shared.recordVisit(url: currentUrl, title: webView.title ?? "")
+            }
         }
 
         public func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
