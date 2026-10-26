@@ -43,7 +43,7 @@ class UpdateManager private constructor(private val context: Context) {
 
     companion object {
         const val DEFAULT_GITHUB_REPO = "alisfa/PathHub"
-        const val COMPILE_VERSION = "1.0.4"
+        const val COMPILE_VERSION = "1.0.5"
         private const val PREF_REPO_KEY = "github_repo"
 
         @Volatile

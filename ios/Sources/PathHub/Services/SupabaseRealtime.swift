@@ -27,6 +27,7 @@ public final class SupabaseRealtime: ObservableObject {
 
     public var onSitesChange: ((RealtimeRecordEvent) -> Void)?
     public var onPlaylistItemsChange: ((RealtimeRecordEvent) -> Void)?
+    public var onHistoryChange: ((RealtimeRecordEvent) -> Void)?
 
     private init() {}
 
@@ -47,6 +48,7 @@ public final class SupabaseRealtime: ObservableObject {
         // Join channels for realtime postgres changes
         joinChannel(topic: "realtime:public:sites")
         joinChannel(topic: "realtime:public:playlist_items")
+        joinChannel(topic: "realtime:public:history")
     }
 
     public func disconnect() {
@@ -154,6 +156,9 @@ public final class SupabaseRealtime: ObservableObject {
                 self.onSitesChange?(changeEvent)
             } else if table == "playlist_items" {
                 self.onPlaylistItemsChange?(changeEvent)
+            } else if table == "history" {
+                self.onHistoryChange?(changeEvent)
+                NotificationCenter.default.post(name: NSNotification.Name("SupabaseHistoryChanged"), object: changeEvent)
             }
         }
     }

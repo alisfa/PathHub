@@ -15,11 +15,9 @@ CREATE TABLE IF NOT EXISTS public.playlists (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- Ensure global shared playlist and balaboo history playlist exist
+-- Ensure global shared playlist exists
 INSERT INTO public.playlists (id, name, invite_code)
-VALUES 
-    ('00000000-0000-0000-0000-000000000001', 'Shared Saved Videos', 'HUB001'),
-    ('00000000-0000-0000-0000-000000000099', 'Balaboo Browsing History', 'BALABOO')
+VALUES ('00000000-0000-0000-0000-000000000001', 'Shared Saved Videos', 'HUB001')
 ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
 
 -- 3. Shared Sites Table (Websites Bookmarks)
@@ -131,4 +129,38 @@ BEGIN
     ) THEN
         ALTER PUBLICATION supabase_realtime ADD TABLE public.playlists;
     END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_publication_tables 
+        WHERE pubname = 'supabase_realtime' AND tablename = 'history'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.history;
+    END IF;
 END $$;
+
+-- ==============================================================================
+-- 5. BALABOO BROWSING HISTORY (PIN 1991)
+-- ==============================================================================
+
+CREATE TABLE IF NOT EXISTS public.history (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    url TEXT NOT NULL,
+    title TEXT DEFAULT '',
+    device_name TEXT NOT NULL DEFAULT 'Unknown Device',
+    visited_at TIMESTAMPTZ DEFAULT now(),
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_history_visited_at ON public.history(visited_at DESC);
+
+ALTER TABLE public.history ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Public full access to history" ON public.history;
+CREATE POLICY "Public full access to history"
+    ON public.history FOR ALL
+    TO anon, authenticated
+    USING (true)
+    WITH CHECK (true);
+
+GRANT ALL ON public.history TO anon, authenticated;
+ALTER TABLE public.history REPLICA IDENTITY FULL;

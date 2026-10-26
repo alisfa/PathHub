@@ -89,8 +89,10 @@ class HistoryStore(private val context: Context) : RealtimeListener {
             val res = restClient.fetchHistory()
             _isLoading.value = false
             res.onSuccess { remoteItems ->
-                _items.value = remoteItems
-                saveCache(remoteItems)
+                if (remoteItems.isNotEmpty()) {
+                    _items.value = remoteItems
+                    saveCache(remoteItems)
+                }
             }.onFailure { err ->
                 Log.e(TAG, "Failed to fetch history: ${err.message}")
             }
@@ -157,18 +159,8 @@ class HistoryStore(private val context: Context) : RealtimeListener {
     }
 
     override fun onTableChanged(event: RealtimeChangeEvent) {
-        if (event.table == "playlist_items") {
-            try {
-                if (event.recordJson.contains(SupabaseRestClient.BALABOO_PLAYLIST_ID) ||
-                    event.oldRecordJson.contains(SupabaseRestClient.BALABOO_PLAYLIST_ID) ||
-                    event.recordJson.contains("urn:balaboo:hist") ||
-                    event.oldRecordJson.contains("urn:balaboo:hist")
-                ) {
-                    fetchHistory()
-                }
-            } catch (e: Exception) {
-                fetchHistory()
-            }
+        if (event.table == "history") {
+            fetchHistory()
         }
     }
 }

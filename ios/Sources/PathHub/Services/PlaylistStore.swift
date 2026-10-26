@@ -26,10 +26,10 @@ public final class PlaylistStore: ObservableObject {
         let fileURL = getFileURL()
         if let data = try? Data(contentsOf: fileURL),
            let decoded = try? JSONDecoder().decode([PlaylistItem].self, from: data) {
-            self.items = decoded.sorted(by: { $0.createdAt > $1.createdAt })
+            self.items = decoded.filter { !$0.videoUrl.hasPrefix("urn:balaboo:") }.sorted(by: { $0.createdAt > $1.createdAt })
         } else if let data = UserDefaults.standard.data(forKey: storageKey),
                   let decoded = try? JSONDecoder().decode([PlaylistItem].self, from: data) {
-            self.items = decoded.sorted(by: { $0.createdAt > $1.createdAt })
+            self.items = decoded.filter { !$0.videoUrl.hasPrefix("urn:balaboo:") }.sorted(by: { $0.createdAt > $1.createdAt })
         }
     }
 
@@ -71,6 +71,12 @@ public final class PlaylistStore: ObservableObject {
 
             switch event.action {
             case .insert:
+                if let pid = event.record["playlist_id"] as? String, pid != self.currentPlaylistId {
+                    return
+                }
+                if let videoUrl = event.record["video_url"] as? String, videoUrl.hasPrefix("urn:balaboo:") {
+                    return
+                }
                 if let id = event.record["id"] as? String,
                    let videoUrl = event.record["video_url"] as? String,
                    let pageUrl = event.record["page_url"] as? String,

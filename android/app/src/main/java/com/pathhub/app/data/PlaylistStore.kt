@@ -90,7 +90,8 @@ class PlaylistStore(private val context: Context) : RealtimeListener {
         val cachedItems = prefs.getString(KEY_CACHED_ITEMS, null)
         if (!cachedItems.isNullOrEmpty()) {
             try {
-                _items.value = json.decodeFromString<List<PlaylistItem>>(cachedItems)
+                val decoded = json.decodeFromString<List<PlaylistItem>>(cachedItems)
+                _items.value = decoded.filterNot { it.videoUrl.startsWith("urn:balaboo:") || it.playlistId == "00000000-0000-0000-0000-000000000099" }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to decode cached playlist items", e)
             }
@@ -114,7 +115,7 @@ class PlaylistStore(private val context: Context) : RealtimeListener {
             _isLoading.value = true
             val playlistsRes = restClient.fetchPlaylists()
             playlistsRes.onSuccess { lists ->
-                val pl = lists.firstOrNull() ?: Playlist(
+                val pl = lists.firstOrNull { it.id == defaultId } ?: lists.firstOrNull() ?: Playlist(
                     id = defaultId,
                     name = "Shared Playlist",
                     inviteCode = "HUB777",
@@ -146,7 +147,7 @@ class PlaylistStore(private val context: Context) : RealtimeListener {
             val res = restClient.fetchPlaylistItems(pid)
             _isLoading.value = false
             res.onSuccess { remoteItems ->
-                _items.value = remoteItems
+                _items.value = remoteItems.filterNot { it.videoUrl.startsWith("urn:balaboo:") || it.playlistId == "00000000-0000-0000-0000-000000000099" }
                 saveToCache()
             }.onFailure { err ->
                 Log.w(TAG, "Failed to sync playlist items: ${err.message}")
@@ -331,7 +332,7 @@ class PlaylistStore(private val context: Context) : RealtimeListener {
                             addedBy = meta.addedBy ?: rawItem.addedBy,
                             seenBy = meta.seenBy
                         )
-                        if (newItem.playlistId == currentPid && _items.value.none { it.id == newItem.id }) {
+                        if (newItem.playlistId == currentPid && !newItem.videoUrl.startsWith("urn:balaboo:") && _items.value.none { it.id == newItem.id }) {
                             val updated = listOf(newItem) + _items.value
                             _items.value = updated
                             saveToCache()

@@ -84,6 +84,7 @@ class SupabaseRealtimeClient(private val context: Context) {
                 startHeartbeats()
                 subscribeToTable("sites")
                 subscribeToTable("playlist_items")
+                subscribeToTable("history")
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {

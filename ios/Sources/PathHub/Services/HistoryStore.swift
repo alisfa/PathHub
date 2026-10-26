@@ -28,7 +28,7 @@ public final class HistoryStore: ObservableObject {
             await fetchHistory()
         }
 
-        NotificationCenter.default.publisher(for: NSNotification.Name("SupabasePlaylistItemsChanged"))
+        NotificationCenter.default.publisher(for: NSNotification.Name("SupabaseHistoryChanged"))
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 Task {
@@ -57,8 +57,10 @@ public final class HistoryStore: ObservableObject {
         isLoading = true
         do {
             let remote = try await SupabaseClient.shared.fetchHistory()
-            self.items = remote
-            saveToCache(remote)
+            if !remote.isEmpty {
+                self.items = remote
+                saveToCache(remote)
+            }
         } catch {
             print("[HistoryStore] Failed to fetch history: \(error.localizedDescription)")
         }
