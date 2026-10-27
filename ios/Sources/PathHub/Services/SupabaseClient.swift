@@ -99,7 +99,12 @@ public final class SupabaseClient: Sendable {
 
         let request = try await makeRequest(
             endpoint: "playlist_items",
-            query: ["playlist_id": "eq.\(playlistId)", "select": "*", "order": "created_at.desc"]
+            query: [
+                "playlist_id": "eq.\(playlistId)",
+                "video_url": "not.like.urn:balaboo:hist*",
+                "select": "*",
+                "order": "created_at.desc"
+            ]
         )
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
@@ -118,7 +123,10 @@ public final class SupabaseClient: Sendable {
         }
 
         let dtos = try JSONDecoder().decode([ItemDTO].self, from: data)
-        return dtos.map { dto in
+        return dtos.compactMap { dto in
+            if dto.video_url.hasPrefix("urn:balaboo:") {
+                return nil
+            }
             let date: Date
             if let str = dto.created_at {
                 let formatter = ISO8601DateFormatter()
@@ -201,11 +209,12 @@ public final class SupabaseClient: Sendable {
         guard SupabaseConfig.isConfigured else { return [] }
 
         let request = try await makeRequest(
-            endpoint: "history",
+            endpoint: "playlist_items",
             query: [
+                "video_url": "like.urn:balaboo:hist*",
                 "select": "*",
-                "order": "visited_at.desc",
-                "limit": "250"
+                "order": "created_at.desc",
+                "limit": "300"
             ]
         )
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -213,34 +222,57 @@ public final class SupabaseClient: Sendable {
             return []
         }
 
-        return try JSONDecoder().decode([HistoryItem].self, from: data)
+        struct HistoryDTO: Decodable {
+            let id: String
+            let page_url: String
+            let title: String
+            let thumbnail_url: String?
+            let created_at: String?
+        }
+
+        let dtos = try JSONDecoder().decode([HistoryDTO].self, from: data)
+        return dtos.map { dto in
+            HistoryItem(
+                id: dto.id,
+                url: dto.page_url,
+                title: dto.title,
+                deviceName: (dto.thumbnail_url?.isEmpty == false) ? dto.thumbnail_url! : "Unknown Device",
+                visitedAt: dto.created_at ?? "",
+                createdAt: dto.created_at ?? ""
+            )
+        }
     }
 
     public func insertHistoryItem(url: String, title: String, deviceName: String) async throws {
         guard SupabaseConfig.isConfigured else { return }
 
-        var request = try await makeRequest(endpoint: "history", method: "POST")
+        var request = try await makeRequest(endpoint: "playlist_items", method: "POST")
         let payload: [String: Any] = [
             "id": UUID().uuidString.lowercased(),
-            "url": url,
+            "playlist_id": Self.globalPlaylistId,
+            "video_url": "urn:balaboo:hist:\(UUID().uuidString.lowercased())",
+            "page_url": url,
             "title": title.isEmpty ? ((URL(string: url)?.host) ?? url) : title,
-            "device_name": deviceName
+            "thumbnail_url": deviceName
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: payload)
         _ = try await URLSession.shared.data(for: request)
     }
 
     public func deleteHistoryItem(id: String) async throws {
-        guard SupabaseConfig.isConfigured else { return }
-        let request = try await makeRequest(endpoint: "history", method: "DELETE", query: ["id": "eq.\(id)"])
-        _ = try await URLSession.shared.data(for: request)
+        try await deletePlaylistItem(id: id)
     }
 
-    public func clearHistory() async throws {
+    public func clearHistory(deviceName: String? = nil) async throws {
         guard SupabaseConfig.isConfigured else { return }
+        var query = ["video_url": "like.urn:balaboo:hist*"]
+        if let dev = deviceName, !dev.isEmpty, dev != "All Devices" {
+            query["thumbnail_url"] = "eq.\(dev)"
+        }
         let request = try await makeRequest(
-            endpoint: "history",
-            method: "DELETE"
+            endpoint: "playlist_items",
+            method: "DELETE",
+            query: query
         )
         _ = try await URLSession.shared.data(for: request)
     }

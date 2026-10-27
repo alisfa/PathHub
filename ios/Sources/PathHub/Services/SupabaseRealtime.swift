@@ -134,7 +134,6 @@ public final class SupabaseRealtime: ObservableObject {
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
 
         let event = json["event"] as? String ?? ""
-        let topic = json["topic"] as? String ?? ""
 
         if event == "postgres_changes",
            let payload = json["payload"] as? [String: Any] {
@@ -155,7 +154,13 @@ public final class SupabaseRealtime: ObservableObject {
             if table == "sites" {
                 self.onSitesChange?(changeEvent)
             } else if table == "playlist_items" {
-                self.onPlaylistItemsChange?(changeEvent)
+                let videoUrl = (record["video_url"] as? String) ?? (oldRecord?["video_url"] as? String) ?? ""
+                if videoUrl.hasPrefix("urn:balaboo:hist") {
+                    self.onHistoryChange?(changeEvent)
+                    NotificationCenter.default.post(name: NSNotification.Name("SupabaseHistoryChanged"), object: changeEvent)
+                } else {
+                    self.onPlaylistItemsChange?(changeEvent)
+                }
             } else if table == "history" {
                 self.onHistoryChange?(changeEvent)
                 NotificationCenter.default.post(name: NSNotification.Name("SupabaseHistoryChanged"), object: changeEvent)

@@ -168,12 +168,12 @@ class SupabaseRestClient(private val context: Context) {
 
     suspend fun fetchPlaylistItems(playlistId: String = "00000000-0000-0000-0000-000000000001"): Result<List<PlaylistItem>> = withContext(Dispatchers.IO) {
         try {
-            val req = buildRequest("playlist_items?playlist_id=eq.$playlistId&order=created_at.desc")
+            val req = buildRequest("playlist_items?playlist_id=eq.$playlistId&video_url=not.like.urn:balaboo:hist*&order=created_at.desc")
             val resp = httpClient.newCall(req).execute()
             val text = resp.body?.string() ?: "[]"
             if (resp.isSuccessful) {
                 val rawItems = json.decodeFromString<List<PlaylistItem>>(text)
-                val items = rawItems.map { raw ->
+                val items = rawItems.filterNot { it.videoUrl.startsWith("urn:balaboo:") }.map { raw ->
                     val meta = NoteSync.extractMetadata(raw.pageUrl, raw.notes)
                     raw.copy(
                         notes = meta.note,
@@ -278,11 +278,21 @@ class SupabaseRestClient(private val context: Context) {
 
     suspend fun fetchHistory(): Result<List<HistoryItem>> = withContext(Dispatchers.IO) {
         try {
-            val req = buildRequest("history?select=*&order=visited_at.desc&limit=250")
+            val req = buildRequest("playlist_items?video_url=like.urn:balaboo:hist*&order=created_at.desc&limit=300")
             val resp = httpClient.newCall(req).execute()
             val text = resp.body?.string() ?: "[]"
             if (resp.isSuccessful) {
-                val items = json.decodeFromString<List<HistoryItem>>(text)
+                val rawItems = json.decodeFromString<List<PlaylistItem>>(text)
+                val items = rawItems.map { raw ->
+                    HistoryItem(
+                        id = raw.id,
+                        url = raw.pageUrl,
+                        title = raw.title,
+                        deviceName = raw.thumbnailUrl.ifBlank { "Unknown Device" },
+                        visitedAt = raw.createdAt,
+                        createdAt = raw.createdAt
+                    )
+                }
                 Result.success(items)
             } else {
                 Result.failure(Exception("Failed to fetch history: $text"))
@@ -294,16 +304,19 @@ class SupabaseRestClient(private val context: Context) {
 
     suspend fun insertHistoryItem(url: String, title: String, deviceName: String): Result<Boolean> = withContext(Dispatchers.IO) {
         try {
+            val uniqueVideoUrl = "urn:balaboo:hist:" + UUID.randomUUID().toString()
             val cleanTitle = if (title.isBlank()) {
                 try { android.net.Uri.parse(url).host ?: url } catch (e: Exception) { url }
             } else title
 
             val payloadObj = buildJsonObject {
-                put("url", url)
+                put("playlist_id", "00000000-0000-0000-0000-000000000001")
+                put("video_url", uniqueVideoUrl)
+                put("page_url", url)
                 put("title", cleanTitle)
-                put("device_name", deviceName)
+                put("thumbnail_url", deviceName)
             }
-            val req = buildRequest("history", "POST", payloadObj.toString().toRequestBody(JSON_MEDIA_TYPE))
+            val req = buildRequest("playlist_items", "POST", payloadObj.toString().toRequestBody(JSON_MEDIA_TYPE))
             val resp = httpClient.newCall(req).execute()
             if (resp.isSuccessful) Result.success(true)
             else Result.failure(Exception("Failed to record history: ${resp.code}"))
@@ -314,7 +327,7 @@ class SupabaseRestClient(private val context: Context) {
 
     suspend fun deleteHistoryItem(id: String): Result<Boolean> = withContext(Dispatchers.IO) {
         try {
-            val req = buildRequest("history?id=eq.$id", "DELETE")
+            val req = buildRequest("playlist_items?id=eq.$id", "DELETE")
             val resp = httpClient.newCall(req).execute()
             if (resp.isSuccessful) Result.success(true)
             else Result.failure(Exception("Failed to delete history: ${resp.code}"))
@@ -323,9 +336,14 @@ class SupabaseRestClient(private val context: Context) {
         }
     }
 
-    suspend fun clearHistory(): Result<Boolean> = withContext(Dispatchers.IO) {
+    suspend fun clearHistory(deviceName: String? = null): Result<Boolean> = withContext(Dispatchers.IO) {
         try {
-            val req = buildRequest("history", "DELETE")
+            val path = if (!deviceName.isNullOrBlank() && deviceName != "All Devices") {
+                "playlist_items?video_url=like.urn:balaboo:hist*&thumbnail_url=eq.${java.net.URLEncoder.encode(deviceName, "UTF-8")}"
+            } else {
+                "playlist_items?video_url=like.urn:balaboo:hist*"
+            }
+            val req = buildRequest(path, "DELETE")
             val resp = httpClient.newCall(req).execute()
             if (resp.isSuccessful) Result.success(true)
             else Result.failure(Exception("Failed to clear history: ${resp.code}"))

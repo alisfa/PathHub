@@ -7,6 +7,7 @@ import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +22,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -63,11 +65,16 @@ import com.pathhub.app.ui.theme.Slate200
 import com.pathhub.app.ui.theme.Slate400
 import com.pathhub.app.ui.theme.Slate700
 import com.pathhub.app.ui.theme.Slate800
-import com.pathhub.app.ui.theme.Slate900
 import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
+
+enum class HistorySortOrder(val title: String) {
+    NEWEST("⚡ Newest"),
+    OLDEST("⏳ Oldest"),
+    DEVICE("📱 By Device"),
+    SITE("🌐 By Site")
+}
 
 @Composable
 fun BalabooHistoryDialog(
@@ -80,18 +87,41 @@ fun BalabooHistoryDialog(
     val isLoading by historyStore.isLoading.collectAsState()
 
     var searchQuery by remember { mutableStateOf("") }
+    var selectedDevice by remember { mutableStateOf("All Devices") }
+    var sortOrder by remember { mutableStateOf(HistorySortOrder.NEWEST) }
     var showClearConfirm by remember { mutableStateOf(false) }
 
-    val filteredItems = remember(historyItems, searchQuery) {
-        if (searchQuery.isBlank()) {
-            historyItems
-        } else {
+    // Unique devices list
+    val devices = remember(historyItems) {
+        val unique = historyItems.map { it.deviceName.ifBlank { "Unknown Device" } }.distinct()
+        listOf("All Devices") + unique
+    }
+
+    // Filter and Sort
+    val processedItems = remember(historyItems, searchQuery, selectedDevice, sortOrder) {
+        var list = historyItems
+
+        // 1. Filter by Device
+        if (selectedDevice != "All Devices") {
+            list = list.filter { it.deviceName.equals(selectedDevice, ignoreCase = true) }
+        }
+
+        // 2. Filter by Search Query
+        if (searchQuery.isNotBlank()) {
             val q = searchQuery.trim().lowercase()
-            historyItems.filter {
+            list = list.filter {
                 it.title.lowercase().contains(q) ||
                 it.url.lowercase().contains(q) ||
                 it.deviceName.lowercase().contains(q)
             }
+        }
+
+        // 3. Sort
+        when (sortOrder) {
+            HistorySortOrder.NEWEST -> list.sortedByDescending { it.visitedAt.ifBlank { it.createdAt } }
+            HistorySortOrder.OLDEST -> list.sortedBy { it.visitedAt.ifBlank { it.createdAt } }
+            HistorySortOrder.DEVICE -> list.sortedWith(compareBy({ it.deviceName.lowercase() }, { it.visitedAt }))
+            HistorySortOrder.SITE -> list.sortedBy { it.title.lowercase().ifBlank { it.url.lowercase() } }
         }
     }
 
@@ -101,8 +131,8 @@ fun BalabooHistoryDialog(
     ) {
         Surface(
             modifier = Modifier
-                .fillMaxWidth(0.95f)
-                .widthIn(max = 540.dp)
+                .fillMaxWidth(0.96f)
+                .widthIn(max = 560.dp)
                 .clip(RoundedCornerShape(24.dp))
                 .border(1.dp, Slate800, RoundedCornerShape(24.dp)),
             color = Obsidian900
@@ -110,8 +140,8 @@ fun BalabooHistoryDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                    .padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 // Header
                 Row(
@@ -125,7 +155,7 @@ fun BalabooHistoryDialog(
                     ) {
                         Text(
                             text = "Balaboo History",
-                            fontSize = 20.sp,
+                            fontSize = 19.sp,
                             fontWeight = FontWeight.Black,
                             letterSpacing = (-0.5).sp,
                             color = Color.White
@@ -134,12 +164,12 @@ fun BalabooHistoryDialog(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(Emerald500.copy(alpha = 0.2f))
-                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                                .padding(horizontal = 7.dp, vertical = 2.dp)
                         ) {
                             Text(
-                                text = "${historyItems.size}",
+                                text = "${processedItems.size}/${historyItems.size}",
                                 color = Emerald400,
-                                fontSize = 12.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -149,14 +179,14 @@ fun BalabooHistoryDialog(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        if (historyItems.isNotEmpty()) {
+                        if (processedItems.isNotEmpty()) {
                             TextButton(
                                 onClick = { showClearConfirm = true }
                             ) {
                                 Text(
-                                    text = "Clear All",
+                                    text = if (selectedDevice == "All Devices") "Clear All" else "Clear Device",
                                     color = Rose500,
-                                    fontSize = 12.sp,
+                                    fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
@@ -165,7 +195,7 @@ fun BalabooHistoryDialog(
                         IconButton(
                             onClick = onDismiss,
                             modifier = Modifier
-                                .size(32.dp)
+                                .size(30.dp)
                                 .clip(CircleShape)
                                 .background(Obsidian950)
                         ) {
@@ -173,7 +203,7 @@ fun BalabooHistoryDialog(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = "Close",
                                 tint = Slate400,
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(16.dp)
                             )
                         }
                     }
@@ -183,13 +213,13 @@ fun BalabooHistoryDialog(
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
-                    placeholder = { Text("Search site, URL, or device...", color = Slate400, fontSize = 13.sp) },
+                    placeholder = { Text("Search site, URL, or device...", color = Slate400, fontSize = 12.sp) },
                     leadingIcon = {
                         Icon(
                             imageVector = Icons.Default.Search,
                             contentDescription = "Search",
                             tint = Slate400,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(16.dp)
                         )
                     },
                     singleLine = true,
@@ -205,34 +235,127 @@ fun BalabooHistoryDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
+                // Device Filter Pills Bar (Horizontal Scroll)
+                if (devices.size > 1) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = "FILTER BY DEVICE",
+                            color = Slate400,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp
+                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            devices.forEach { dev ->
+                                val isSelected = dev == selectedDevice
+                                val devCount = if (dev == "All Devices") historyItems.size
+                                else historyItems.count { it.deviceName.equals(dev, ignoreCase = true) }
+
+                                val icon = if (dev == "All Devices") "🌐"
+                                else if (dev.lowercase().contains("iphone") || dev.lowercase().contains("ipad")) "📱"
+                                else "🤖"
+
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(if (isSelected) Emerald500 else Color(0x301E293B))
+                                        .border(
+                                            1.dp,
+                                            if (isSelected) Emerald400 else Color.White.copy(alpha = 0.08f),
+                                            RoundedCornerShape(10.dp)
+                                        )
+                                        .clickable { selectedDevice = dev }
+                                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                                ) {
+                                    Text(
+                                        text = "$icon $dev ($devCount)",
+                                        color = if (isSelected) Obsidian950 else Slate200,
+                                        fontWeight = if (isSelected) FontWeight.Black else FontWeight.SemiBold,
+                                        fontSize = 11.sp,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Sort Options Bar
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "SORT:",
+                        color = Slate400,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.5.sp
+                    )
+
+                    HistorySortOrder.values().forEach { so ->
+                        val isSelected = so == sortOrder
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (isSelected) Slate700 else Obsidian950)
+                                .border(
+                                    1.dp,
+                                    if (isSelected) Emerald500 else Slate800,
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .clickable { sortOrder = so }
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = so.title,
+                                color = if (isSelected) Emerald400 else Slate400,
+                                fontSize = 10.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+
                 // List Area
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(min = 200.dp, max = 460.dp)
+                        .heightIn(min = 180.dp, max = 400.dp)
                 ) {
-                    if (filteredItems.isEmpty()) {
+                    if (processedItems.isEmpty()) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(200.dp),
+                                .height(180.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             if (isLoading) {
-                                CircularProgressIndicator(color = Emerald500, modifier = Modifier.size(32.dp))
+                                CircularProgressIndicator(color = Emerald500, modifier = Modifier.size(30.dp))
                             } else {
                                 Column(
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
-                                    Text("🕵️", fontSize = 28.sp)
+                                    Text("🕵️", fontSize = 26.sp)
                                     Text(
-                                        text = if (searchQuery.isNotBlank()) "No matching records" else "No browsing history yet",
+                                        text = if (searchQuery.isNotBlank() || selectedDevice != "All Devices")
+                                            "No records matching filter"
+                                        else
+                                            "No browsing history yet",
                                         color = Slate400,
-                                        fontSize = 14.sp
+                                        fontSize = 13.sp
                                     )
                                     Text(
-                                        text = "Visits synced across all devices will appear here",
+                                        text = "Visits synced across all devices will appear here in realtime",
                                         color = Slate700,
                                         fontSize = 11.sp
                                     )
@@ -242,9 +365,9 @@ fun BalabooHistoryDialog(
                     } else {
                         LazyColumn(
                             modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            verticalArrangement = Arrangement.spacedBy(7.dp)
                         ) {
-                            items(filteredItems, key = { it.id.ifBlank { it.url + it.visitedAt } }) { item ->
+                            items(processedItems, key = { it.id.ifBlank { it.url + it.visitedAt } }) { item ->
                                 HistoryRow(
                                     item = item,
                                     onDelete = { historyStore.deleteItem(item.id) },
@@ -273,7 +396,7 @@ fun BalabooHistoryDialog(
                         text = "Done",
                         color = Emerald400,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp
+                        fontSize = 13.sp
                     )
                 }
             }
@@ -294,13 +417,16 @@ fun BalabooHistoryDialog(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(
-                        text = "Clear All History?",
+                        text = if (selectedDevice == "All Devices") "Clear All History?" else "Clear $selectedDevice History?",
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
                         fontSize = 16.sp
                     )
                     Text(
-                        text = "This will permanently remove browsing history records across all synced devices.",
+                        text = if (selectedDevice == "All Devices")
+                            "This will permanently delete all browsing history across all devices."
+                        else
+                            "This will delete history recorded on $selectedDevice across all devices.",
                         color = Slate400,
                         fontSize = 13.sp
                     )
@@ -313,10 +439,10 @@ fun BalabooHistoryDialog(
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         TextButton(onClick = {
-                            historyStore.clearHistory()
+                            historyStore.clearHistory(if (selectedDevice == "All Devices") null else selectedDevice)
                             showClearConfirm = false
                         }) {
-                            Text("Clear All", color = Rose500, fontWeight = FontWeight.Bold)
+                            Text("Clear", color = Rose500, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -332,6 +458,7 @@ private fun HistoryRow(
     onClick: () -> Unit
 ) {
     val formattedTime = remember(item.visitedAt) { formatTimestamp(item.visitedAt) }
+    val deviceIcon = if (item.deviceName.lowercase().contains("iphone") || item.deviceName.lowercase().contains("ipad")) "📱" else "🤖"
 
     Row(
         modifier = Modifier
@@ -340,13 +467,13 @@ private fun HistoryRow(
             .background(Color(0x601E293B))
             .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
-            .padding(12.dp),
+            .padding(10.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            verticalArrangement = Arrangement.spacedBy(3.dp)
         ) {
             Text(
                 text = item.title.ifBlank { item.url },
@@ -378,7 +505,7 @@ private fun HistoryRow(
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        text = "📱 ${item.deviceName}",
+                        text = "$deviceIcon ${item.deviceName}",
                         color = Emerald400,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.SemiBold
@@ -396,13 +523,13 @@ private fun HistoryRow(
 
         IconButton(
             onClick = onDelete,
-            modifier = Modifier.size(32.dp)
+            modifier = Modifier.size(30.dp)
         ) {
             Icon(
                 imageVector = Icons.Default.Delete,
                 contentDescription = "Delete",
                 tint = Slate400,
-                modifier = Modifier.size(16.dp)
+                modifier = Modifier.size(15.dp)
             )
         }
     }

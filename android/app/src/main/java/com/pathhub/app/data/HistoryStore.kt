@@ -89,10 +89,8 @@ class HistoryStore(private val context: Context) : RealtimeListener {
             val res = restClient.fetchHistory()
             _isLoading.value = false
             res.onSuccess { remoteItems ->
-                if (remoteItems.isNotEmpty()) {
-                    _items.value = remoteItems
-                    saveCache(remoteItems)
-                }
+                _items.value = remoteItems
+                saveCache(remoteItems)
             }.onFailure { err ->
                 Log.e(TAG, "Failed to fetch history: ${err.message}")
             }
@@ -149,18 +147,26 @@ class HistoryStore(private val context: Context) : RealtimeListener {
         }
     }
 
-    fun clearHistory() {
-        _items.value = emptyList()
-        saveCache(emptyList())
+    fun clearHistory(deviceName: String? = null) {
+        if (!deviceName.isNullOrBlank() && deviceName != "All Devices") {
+            val updated = _items.value.filterNot { it.deviceName.equals(deviceName, ignoreCase = true) }
+            _items.value = updated
+            saveCache(updated)
+        } else {
+            _items.value = emptyList()
+            saveCache(emptyList())
+        }
 
         scope.launch {
-            restClient.clearHistory()
+            restClient.clearHistory(deviceName)
         }
     }
 
     override fun onTableChanged(event: RealtimeChangeEvent) {
-        if (event.table == "history") {
-            fetchHistory()
+        if (event.table == "playlist_items") {
+            if (event.recordJson.contains("urn:balaboo:hist") || event.oldRecordJson.contains("urn:balaboo:hist")) {
+                fetchHistory()
+            }
         }
     }
 }

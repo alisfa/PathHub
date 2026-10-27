@@ -125,13 +125,17 @@ public final class HistoryStore: ObservableObject {
     }
 
     @MainActor
-    public func clearHistory() {
-        self.items = []
-        saveToCache([])
+    public func clearHistory(deviceName: String? = nil) {
+        if let dev = deviceName, !dev.isEmpty, dev != "All Devices" {
+            self.items = self.items.filter { $0.deviceName != dev }
+        } else {
+            self.items = []
+        }
+        saveToCache(self.items)
 
         Task {
             do {
-                try await SupabaseClient.shared.clearHistory()
+                try await SupabaseClient.shared.clearHistory(deviceName: deviceName)
             } catch {
                 print("[HistoryStore] Failed to clear history: \(error)")
             }
